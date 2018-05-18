@@ -8,6 +8,7 @@ import platform
 import sys
 
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from package import Package
 
@@ -18,7 +19,8 @@ package_dict = {}
 
 
 def p_list_simple(request):
-    os.system('python -m pip freeze > swap/p_list_simple.txt')
+    cmd = 'python -m pip freeze --isolated --disable-pip-version-check --all > swap/p_list_simple.txt'
+    os.system(cmd)
     output = None
     with open('swap/p_list_simple.txt') as f:
         output = f.read()
@@ -33,6 +35,18 @@ def p_list_simple(request):
             package_dict[package.package] = package
     print get_package_list_from_dict()
     return HttpResponse(json.dumps(get_package_list_from_dict()))
+
+
+@csrf_exempt
+def summary(request):
+    if request.method == 'POST':
+        p_list_str = request.POST.get('list', '[]')
+        print(p_list_str)
+        p_list = json.loads(p_list_str, "utf-8")
+        for p in p_list:
+            print p
+        return HttpResponse(json.dumps(p_list))
+    return HttpResponse('[]')
 
 
 def get_interpreter(request):
