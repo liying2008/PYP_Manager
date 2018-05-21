@@ -10,7 +10,8 @@ import sys
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from package import Package
+from pyp.package import Package
+from pyp.summary import Summary
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -33,8 +34,8 @@ def p_list_simple(request):
             package.package = info[0]
             package.version = info[1]
             package_dict[package.package] = package
-    print get_package_list_from_dict()
-    return HttpResponse(json.dumps(get_package_list_from_dict()))
+    print get_list_from_dict(package_dict)
+    return HttpResponse(json.dumps(get_list_from_dict(package_dict)))
 
 
 @csrf_exempt
@@ -43,10 +44,24 @@ def summary(request):
         p_list_str = request.POST.get('list', '[]')
         print(p_list_str)
         p_list = json.loads(p_list_str, "utf-8")
+        summary_dict = {}
         for p in p_list:
-            print p
-        return HttpResponse(json.dumps(p_list))
-    return HttpResponse('[]')
+            cmd = 'python -m pip show ' + p + ' --disable-pip-version-check > swap/p_summary.txt'
+            os.system(cmd)
+            output = None
+            with open('swap/p_summary.txt') as f:
+                output = f.read()
+            splites = output.split("\n")
+            s = Summary()
+            s.package = p
+            if len(splites) >= 3 and splites[2].startswith('Summary:'):
+                s.summary = splites[2].split(': ')[1]
+            else:
+                s.summary = ''
+            summary_dict[p] = s.__dict__
+        print summary_dict
+        return HttpResponse(json.dumps(summary_dict))
+    return HttpResponse('{}')
 
 
 def get_interpreter(request):
@@ -60,8 +75,8 @@ def get_interpreter(request):
     return HttpResponse(json.dumps(options))
 
 
-def get_package_list_from_dict():
-    package_list = []
-    for index, item in package_dict.items():
-        package_list.append(item.__dict__)
-    return package_list
+def get_list_from_dict(dict):
+    list = []
+    for index, item in dict.items():
+        list.append(item.__dict__)
+    return list

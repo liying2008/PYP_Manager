@@ -68,7 +68,7 @@
 </template>
 
 <script>
-  import Qs from 'qs'
+  import Vue from 'vue'
 
   export default {
     name: 'Manager',
@@ -112,7 +112,10 @@
       get_simple_list() {
         this.$axios.get('/simple_list')
           .then(response => {
-            this.packageList = response.data;
+            this.packageList = response.data.map(val => {
+              val.summary = "Searching for summary...";
+              return val
+            });
             this.loading = false;
             this.get_summary()
           })
@@ -126,13 +129,22 @@
         let list = this.packageList.map(val => {
           return val.package
         });
-        let params = Qs.stringify({list: list});
-        this.$axios.post('/summary', params, {headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
-          .then(function (response) {
-            console.log(response);
+        let params = new URLSearchParams();
+        params.append('list', JSON.stringify(list));
+        // params.append('list', JSON.stringify(['Django']));
+        this.$axios.post('/summary', params)
+          .then(response => {
+            let summary_dict = response.data;
+            // console.log(summary_dict);
+            this.packageList.forEach((val, index) => {
+              val.summary = summary_dict[val.package].summary;
+              // update package list
+              Vue.set(this.packageList, index, val);
+            })
           })
-          .catch(function (error) {
+          .catch(error => {
             console.log(error);
+            this.$message.error('Get Python package summary error!');
           });
       },
       upgrade(row) {

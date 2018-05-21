@@ -5,7 +5,7 @@
 __author__ = 'liying'
 
 
-class Package(object):
+class Summary(object):
     def __init__(self):
         self.package = None
-        self.version = None
+        self.summary = None
