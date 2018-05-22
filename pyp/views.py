@@ -10,8 +10,9 @@ import sys
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from pyp.package import Package
-from pyp.summary import Summary
+from pyp.model.package import Package
+from pyp.model.summary import Summary
+from pyp.model.latest import Latest
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -46,7 +47,7 @@ def summary(request):
         p_list = json.loads(p_list_str, "utf-8")
         summary_dict = {}
         for p in p_list:
-            cmd = 'python -m pip show ' + p + ' --disable-pip-version-check > swap/p_summary.txt'
+            cmd = 'python -m pip show ' + p + ' --isolated --disable-pip-version-check > swap/p_summary.txt'
             os.system(cmd)
             output = None
             with open('swap/p_summary.txt') as f:
@@ -64,6 +65,22 @@ def summary(request):
     return HttpResponse('{}')
 
 
+def check_latest(request):
+    cmd = 'python -m pip list -o --isolated --disable-pip-version-check --format json > swap/p_check_latest.txt'
+    os.system(cmd)
+    output = None
+    with open('swap/p_check_latest.txt') as f:
+        output = f.read()
+    p_list_ori = json.loads(output)
+    p_dict = {}
+    for item in p_list_ori:
+        latest = Latest()
+        latest.package = item['name']
+        latest.latest_version = item['latest_version']
+        p_dict[latest.package] = latest.__dict__
+    return HttpResponse(json.dumps(p_dict))
+
+
 def get_interpreter(request):
     options = []
     # 得到默认 Python 解释器路径
@@ -79,4 +96,8 @@ def get_list_from_dict(dict):
     list = []
     for index, item in dict.items():
         list.append(item.__dict__)
+
+    # ========= Just for develop and test ===========
+    list = list[:5]
+    # ===============================================
     return list

@@ -12,18 +12,19 @@
     </p>
     <p id="p_buttons">
       <span class="empty"></span>
-      <el-button type="primary" plain>Check Latest</el-button>
-      <el-button type="success" plain>Upgrade</el-button>
-      <el-button type="danger" plain>Uninstall</el-button>
+      <el-button type="primary" plain @click="checkLatest">Check Latest</el-button>
+      <el-button type="success" plain @click="upgrade('')">Upgrade</el-button>
+      <el-button type="danger" plain @click="uninstall('')">Uninstall</el-button>
       <el-button type="primary" icon="el-icon-plus" circle></el-button>
+      <el-button type="info" icon="el-icon-setting" circle></el-button>
     </p>
     <div class="manager-container-table">
       <!--Package list-->
       <el-table
         :data="packageList"
+        :row-class-name="tableRowClassName"
         v-loading="loading"
         border
-        stripe
         tooltip-effect="dark"
         show-overflow-tooltip
         @selection-change="handleSelectionChange"
@@ -58,8 +59,8 @@
           label="Operation"
           width="200">
           <template slot-scope="scope">
-            <el-button @click="upgrade(scope.row)" type="success" size="small">Upgrade</el-button>
-            <el-button @click="uninstall(scope.row)" type="danger" size="small">Uninstall</el-button>
+            <el-button @click="upgrade([scope.row.package])" type="success" size="small">Upgrade</el-button>
+            <el-button @click="uninstall([scope.row.package])" type="danger" size="small">Uninstall</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -70,6 +71,7 @@
 <script>
   import Vue from 'vue'
 
+  let defaultLatest = '---';
   export default {
     name: 'Manager',
     data() {
@@ -134,10 +136,10 @@
         // params.append('list', JSON.stringify(['Django']));
         this.$axios.post('/summary', params)
           .then(response => {
-            let summary_dict = response.data;
+            let summaryDict = response.data;
             // console.log(summary_dict);
             this.packageList.forEach((val, index) => {
-              val.summary = summary_dict[val.package].summary;
+              val.summary = summaryDict[val.package].summary;
               // update package list
               Vue.set(this.packageList, index, val);
             })
@@ -147,25 +149,57 @@
             this.$message.error('Get Python package summary error!');
           });
       },
-      upgrade(row) {
-        console.log(row);
+      get_pkgs_from_selection() {
+        return this.multipleSelection.map(val => {
+          return val.package
+        })
       },
-      uninstall(row) {
-        console.log(row);
+      checkLatest() {
+        this.$axios.get('/check_latest')
+          .then(response => {
+            let latestVersions = response.data;
+            this.packageList.forEach((val, index) => {
+              if (latestVersions.hasOwnProperty(val.package)) {
+                val.latest = latestVersions[val.package].latest_version;
+              } else {
+                val.latest = defaultLatest;
+              }
+              // update package list
+              Vue.set(this.packageList, index, val);
+            })
+          })
+          .catch(error => {
+            console.log(error);
+          });
+      },
+      upgrade(pkg) {
+        if (pkg === '') {
+          pkg = this.get_pkgs_from_selection()
+        }
+        console.log(pkg);
+      },
+      uninstall(pkg) {
+        if (pkg === '') {
+          pkg = this.get_pkgs_from_selection()
+        }
+        console.log(pkg);
       },
       handleSelectionChange(val) {
         this.multipleSelection = val;
+      },
+      tableRowClassName({row, rowIndex}) {
+        if (row.latest !== undefined && row.latest !== defaultLatest) {
+          return 'warning-row';
+        } else {
+          return '';
+        }
       }
-    },
+    }
   }
 </script>
 
 <style lang="scss">
   $main_color: #409EFF;
-  body {
-    margin: 0;
-    padding: 0;
-  }
 
   .manager-container {
     margin: 20px 26px 26px 20px;
@@ -195,5 +229,9 @@
       font-family: monospace, sans-serif;
       font-size: 1.2em;
     }
+  }
+
+  .el-table .warning-row {
+    background: oldlace;
   }
 </style>
