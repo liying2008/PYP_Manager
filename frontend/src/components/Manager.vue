@@ -12,9 +12,9 @@
     </p>
     <p id="p_buttons">
       <span class="empty"></span>
-      <el-button type="primary" plain @click="checkLatest">Check Latest</el-button>
-      <el-button type="success" plain @click="upgrade('')">Upgrade</el-button>
-      <el-button type="danger" plain @click="uninstall('')">Uninstall</el-button>
+      <el-button type="primary" plain @click="getCheckLatestData">Check Latest</el-button>
+      <el-button type="success" plain @click="postUpgradeData('')">Upgrade</el-button>
+      <el-button type="danger" plain @click="postUninstallData('')">Uninstall</el-button>
       <el-button type="primary" icon="el-icon-plus" circle></el-button>
       <el-button type="info" icon="el-icon-setting" circle></el-button>
     </p>
@@ -59,8 +59,8 @@
           label="Operation"
           width="200">
           <template slot-scope="scope">
-            <el-button @click="upgrade([scope.row.package])" type="success" size="small">Upgrade</el-button>
-            <el-button @click="uninstall([scope.row.package])" type="danger" size="small">Uninstall</el-button>
+            <el-button @click="postUpgradeData([scope.row.package])" type="success" size="small">Upgrade</el-button>
+            <el-button @click="postUninstallData([scope.row.package])" type="danger" size="small">Uninstall</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -71,7 +71,11 @@
 <script>
   import Vue from 'vue'
 
-  let defaultLatest = '---';
+  const TAG_DEFAULT_LATEST = '---';
+  const TAG_WAIT_LATEST = 'Checking the update...';
+  const UPDATE_SUCCESS = 'SUCCESS';
+  const UPDATE_FAILED = 'FAILED';
+  const UPDATING = 'Updating...';
   export default {
     name: 'Manager',
     data() {
@@ -103,7 +107,7 @@
             this.defaultInterpreter = 'No Python Interpreter Was Detected.';
           } else {
             this.defaultInterpreter = this.options[0].value;
-            this.get_simple_list()
+            this.getSimpleListData()
           }
         })
         .catch(error => {
@@ -111,7 +115,7 @@
         });
     },
     methods: {
-      get_simple_list() {
+      getSimpleListData() {
         this.$axios.get('/simple_list')
           .then(response => {
             this.packageList = response.data.map(val => {
@@ -119,7 +123,7 @@
               return val
             });
             this.loading = false;
-            this.get_summary()
+            this.postSummaryData()
           })
           .catch(error => {
             console.log(error);
@@ -127,7 +131,7 @@
             this.$message.error('Get Python package list error!');
           });
       },
-      get_summary() {
+      postSummaryData() {
         let list = this.packageList.map(val => {
           return val.package
         });
@@ -149,12 +153,17 @@
             this.$message.error('Get Python package summary error!');
           });
       },
-      get_pkgs_from_selection() {
+      getPkgsFromSelection() {
         return this.multipleSelection.map(val => {
           return val.package
         })
       },
-      checkLatest() {
+      getCheckLatestData() {
+        this.packageList.forEach((val, index) => {
+          val.latest = TAG_WAIT_LATEST;
+          // update package list
+          Vue.set(this.packageList, index, val);
+        });
         this.$axios.get('/check_latest')
           .then(response => {
             let latestVersions = response.data;
@@ -162,7 +171,7 @@
               if (latestVersions.hasOwnProperty(val.package)) {
                 val.latest = latestVersions[val.package].latest_version;
               } else {
-                val.latest = defaultLatest;
+                val.latest = TAG_DEFAULT_LATEST;
               }
               // update package list
               Vue.set(this.packageList, index, val);
@@ -172,15 +181,50 @@
             console.log(error);
           });
       },
-      upgrade(pkg) {
+      postUpgradeData(pkg) {
         if (pkg === '') {
-          pkg = this.get_pkgs_from_selection()
+          pkg = this.getPkgsFromSelection()
         }
-        console.log(pkg);
+        this.packageList.forEach((val, index) => {
+          if (pkg.indexOf(val.package) >= 0) {
+            val.version = UPDATING;
+            // update package list
+            Vue.set(this.packageList, index, val);
+          }
+        });
+        // console.log(pkg);
+        let params = new URLSearchParams();
+        params.append('list', JSON.stringify(pkg));
+        this.$axios.post('/postUpgradeData', params)
+          .then(response => {
+            let upgradeDict = response.data;
+            console.log(upgradeDict);
+            this.packageList.forEach((val, index) => {
+              if (upgradeDict.hasOwnProperty(val.package)) {
+                let result = upgradeDict[val.package];
+                if (result === 'success') {
+                  if (val.latest === undefined || val.latest === TAG_DEFAULT_LATEST || val.latest === TAG_WAIT_LATEST) {
+                    val.version = UPDATE_SUCCESS
+                  } else {
+                    val.version = UPDATE_SUCCESS + ' : ' + val.latest
+                  }
+                } else if (result === 'failed') {
+                  val.version = UPDATE_FAILED
+                }
+                // update package list
+                Vue.set(this.packageList, index, val);
+              }
+            })
+          })
+          .catch(error => {
+            console.log(error);
+            this.$message.error('Get Python package summary error!');
+          });
+
       },
-      uninstall(pkg) {
+      postUninstallData(pkg) {
         if (pkg === '') {
-          pkg = this.get_pkgs_from_selection()
+          pkg = this.getPkgsFromSelection()
         }
         console.log(pkg);
       },
@@ -188,11 +232,18 @@
         this.multipleSelection = val;
       },
       tableRowClassName({row, rowIndex}) {
-        if (row.latest !== undefined && row.latest !== defaultLatest) {
-          return 'warning-row';
-        } else {
-          return '';
+        let style = '';
+        if (row.latest !== undefined && row.latest !== TAG_DEFAULT_LATEST && row.latest !== TAG_WAIT_LATEST) {
+          style = 'warning-row';
         }
+        if (row.version.indexOf(UPDATE_SUCCESS) === 0) {
+          style = 'success-row';
+        } else if (row.version.indexOf(UPDATE_FAILED) === 0) {
+          style = 'failed-row';
+        } else if (row.version.indexOf(UPDATING) === 0) {
+          style = 'updating-row';
+        }
+        return style
       }
     }
   }
@@ -232,6 +283,18 @@
   }
 
   .el-table .warning-row {
-    background: oldlace;
+    background: #defdff;
+  }
+
+  .el-table .failed-row {
+    background: #feebdd;
+  }
+
+  .el-table .success-row {
+    background: #def9d7;
+  }
+
+  .el-table .updating-row {
+    background: #e6e6e6;
   }
 </style>

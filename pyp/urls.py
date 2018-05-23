@@ -11,4 +11,5 @@ urlpatterns = [
     url(r'^interpreters$', views.get_interpreter),
     url(r'^summary$', views.summary),
     url(r'^check_latest$', views.check_latest),
+    url(r'^postUpgradeData$', views.upgrade),
 ]
