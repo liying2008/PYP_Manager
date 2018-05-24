@@ -15,8 +15,8 @@
       <el-button type="primary" plain @click="getCheckLatestData">Check Latest</el-button>
       <el-button type="success" plain @click="postUpgradeData('')">Upgrade</el-button>
       <el-button type="danger" plain @click="postUninstallData('')">Uninstall</el-button>
-      <el-button type="primary" icon="el-icon-plus" circle></el-button>
-      <el-button type="info" icon="el-icon-setting" circle></el-button>
+      <el-button type="primary" icon="el-icon-plus" circle @click="searchDialogVisible=true"></el-button>
+      <el-button type="info" icon="el-icon-setting" circle @click="settingsDialogVisible=true"></el-button>
     </p>
     <div class="manager-container-table">
       <!--Package list-->
@@ -65,11 +65,18 @@
         </el-table-column>
       </el-table>
     </div>
+    <search-package
+      :show="searchDialogVisible"
+      @closeDialog="searchDialogVisible=false">
+    </search-package>
+    <settings></settings>
   </div>
 </template>
 
 <script>
   import Vue from 'vue'
+  import SearchPackage from '../search/SearchPackage'
+  import Settings from '../settings/Settings'
 
   const TAG_DEFAULT_LATEST = '---';
   const TAG_WAIT_LATEST = 'Checking the update...';
@@ -94,7 +101,9 @@
         }
         */
         packageList: [],
-        multipleSelection: []
+        multipleSelection: [],
+        searchDialogVisible: false,
+        settingsDialogVisible: false,
       }
     },
     created() {
@@ -121,7 +130,7 @@
         this.$axios.get('/simple_list')
           .then(response => {
             this.packageList = response.data.map(val => {
-              val.summary = "Searching for summary...";
+              val.summary = 'Searching for summary...';
               return val
             });
             this.loading = false;
@@ -287,6 +296,10 @@
         }
         return style
       }
+    },
+    components: {
+      SearchPackage,
+      Settings
     }
   }
 </script>
