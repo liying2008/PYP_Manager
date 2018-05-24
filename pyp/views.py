@@ -85,11 +85,29 @@ def upgrade(request):
     for p in p_list:
         cmd = 'python -m pip install -U ' + p + ' --isolated'
         output = os.popen(cmd).read()
-        if 'Successfully installed' in output or 'Requirement already up-to-date' in output:
+        if 'Successfully installed ' in output or 'Requirement already up-to-date' in output:
             upgrade_dict[p] = 'success'
         else:
             upgrade_dict[p] = 'failed'
     return HttpResponse(json.dumps(upgrade_dict))
+
+
+@fn_timer
+@csrf_exempt
+def uninstall(request):
+    if request.method != 'POST':
+        return HttpResponse('{}')
+    p_list_str = request.POST.get('list', '[]')
+    p_list = json.loads(p_list_str, "utf-8")
+    uninstall_dict = {}
+    for p in p_list:
+        cmd = 'python -m pip uninstall ' + p + ' --isolated -y'
+        output = os.popen(cmd).read()
+        if 'Successfully uninstalled ' in output or 'as it is not installed.' in output:
+            uninstall_dict[p] = 'success'
+        else:
+            uninstall_dict[p] = 'failed'
+    return HttpResponse(json.dumps(uninstall_dict))
 
 
 @fn_timer
@@ -104,7 +122,6 @@ def get_interpreter(request):
     return HttpResponse(json.dumps(options))
 
 
-@fn_timer
 def get_list_from_dict(dict):
     list = []
     for index, item in dict.items():

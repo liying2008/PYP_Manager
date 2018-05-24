@@ -76,6 +76,8 @@
   const UPDATE_SUCCESS = 'SUCCESS';
   const UPDATE_FAILED = 'FAILED';
   const UPDATING = 'Updating...';
+  const UNINSTALLING = 'Uninstalling...';
+  const UNINSTALL_FAILED = 'FAILED';
   export default {
     name: 'Manager',
     data() {
@@ -144,6 +146,9 @@
             // console.log(summary_dict);
             this.packageList.forEach((val, index) => {
               val.summary = summaryDict[val.package].summary;
+              if (val.summary === '') {
+                val.summary = '(No Summary)'
+              }
               // update package list
               Vue.set(this.packageList, index, val);
             })
@@ -195,7 +200,7 @@
         // console.log(pkg);
         let params = new URLSearchParams();
         params.append('list', JSON.stringify(pkg));
-        this.$axios.post('/postUpgradeData', params)
+        this.$axios.post('/upgrade', params)
           .then(response => {
             let upgradeDict = response.data;
             console.log(upgradeDict);
@@ -218,7 +223,7 @@
           })
           .catch(error => {
             console.log(error);
-            this.$message.error('Get Python package summary error!');
+            this.$message.error('Upgrade Python package(s) error!');
           });
 
       },
@@ -226,7 +231,43 @@
         if (pkg === '') {
           pkg = this.getPkgsFromSelection()
         }
-        console.log(pkg);
+        this.packageList.forEach((val, index) => {
+          if (pkg.indexOf(val.package) >= 0) {
+            val.version = UNINSTALLING;
+            // update package list
+            Vue.set(this.packageList, index, val);
+          }
+        });
+        // console.log(pkg);
+        let params = new URLSearchParams();
+        params.append('list', JSON.stringify(pkg));
+        this.$axios.post('/uninstall', params)
+          .then(response => {
+            let uninstallDict = response.data;
+            console.log(uninstallDict);
+            let uninstallList = [];
+            this.packageList.forEach((val, index) => {
+              if (uninstallDict.hasOwnProperty(val.package)) {
+                let result = uninstallDict[val.package];
+                if (result === 'success') {
+                  uninstallList.push(index);
+                } else if (result === 'failed') {
+                  val.version = UNINSTALL_FAILED;
+                  // update package list
+                  Vue.set(this.packageList, index, val);
+                }
+              }
+            });
+            uninstallList.forEach((val, index) => {
+              // remove this item
+              console.log('Uninstall: ', this.packageList[val - index]);
+              this.packageList.splice(val - index, 1)
+            })
+          })
+          .catch(error => {
+            console.log(error);
+            this.$message.error('Uninstall Python package(s) error!');
+          });
       },
       handleSelectionChange(val) {
         this.multipleSelection = val;
@@ -238,7 +279,8 @@
         }
         if (row.version.indexOf(UPDATE_SUCCESS) === 0) {
           style = 'success-row';
-        } else if (row.version.indexOf(UPDATE_FAILED) === 0) {
+        } else if (row.version.indexOf(UPDATE_FAILED) === 0 ||
+          row.version.indexOf(UNINSTALL_FAILED) === 0) {
           style = 'failed-row';
         } else if (row.version.indexOf(UPDATING) === 0) {
           style = 'updating-row';
