@@ -37,7 +37,7 @@
           this.$emit('closeDialog');
         }
       }
-    },
+    }
   }
 </script>
 

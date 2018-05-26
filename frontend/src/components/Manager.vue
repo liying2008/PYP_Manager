@@ -10,73 +10,80 @@
         </el-option>
       </el-select>
     </p>
-    <p id="p_buttons">
-      <span class="empty"></span>
-      <el-button type="primary" plain @click="getCheckLatestData">Check Latest</el-button>
-      <el-button type="success" plain @click="postUpgradeData('')">Upgrade</el-button>
-      <el-button type="danger" plain @click="postUninstallData('')">Uninstall</el-button>
-      <el-button type="primary" icon="el-icon-plus" circle @click="searchDialogVisible=true"></el-button>
-      <el-button type="info" icon="el-icon-setting" circle @click="settingsDialogVisible=true"></el-button>
-    </p>
-    <div class="manager-container-table">
-      <!--Package list-->
-      <el-table
-        :data="packageList"
-        :row-class-name="tableRowClassName"
-        v-loading="loading"
-        border
-        tooltip-effect="dark"
-        show-overflow-tooltip
-        @selection-change="handleSelectionChange"
-        style="width: 100%">
-        <el-table-column
-          type="selection"
-          width="55">
-        </el-table-column>
-        <el-table-column
-          fixed
-          sortable
-          prop="package"
-          label="Package"
-          width="420">
-        </el-table-column>
-        <el-table-column
-          prop="version"
-          label="Version"
-          width="120">
-        </el-table-column>
-        <el-table-column
-          prop="latest"
-          label="Latest"
-          width="120">
-        </el-table-column>
-        <el-table-column
-          prop="summary"
-          label="Summary">
-        </el-table-column>
-        <el-table-column
-          fixed="right"
-          label="Operation"
-          width="200">
-          <template slot-scope="scope">
-            <el-button @click="postUpgradeData([scope.row.package])" type="success" size="small">Upgrade</el-button>
-            <el-button @click="postUninstallData([scope.row.package])" type="danger" size="small">Uninstall</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <div v-loading="loading">
+      <p id="p_buttons">
+      <span>
+        <span id="tips" v-show="!hasCheckedUpgrade">Click the
+          <span id="cl">Check Latest</span> button to Check for updates.</span>
+      </span>
+        <el-button type="primary" plain @click="getCheckLatestData">Check Latest</el-button>
+        <el-button type="success" plain @click="postUpgradeData('')">Upgrade</el-button>
+        <el-button type="danger" plain @click="postUninstallData('')">Uninstall</el-button>
+        <el-button type="primary" icon="el-icon-plus" circle @click="searchDialogVisible=true"></el-button>
+        <el-button type="info" icon="el-icon-setting" circle @click="settingsDialogVisible=true"></el-button>
+      </p>
+      <div class="manager-container-table">
+        <!--Package list-->
+        <el-table
+          :data="packageList"
+          :row-class-name="tableRowClassName"
+          border
+          tooltip-effect="dark"
+          show-overflow-tooltip
+          @selection-change="handleSelectionChange"
+          style="width: 100%">
+          <el-table-column
+            type="selection"
+            width="55">
+          </el-table-column>
+          <el-table-column
+            fixed
+            sortable
+            prop="package"
+            label="Package"
+            width="420">
+          </el-table-column>
+          <el-table-column
+            prop="version"
+            label="Version"
+            width="120">
+          </el-table-column>
+          <el-table-column
+            prop="latest"
+            label="Latest"
+            width="120">
+          </el-table-column>
+          <el-table-column
+            prop="summary"
+            label="Summary">
+          </el-table-column>
+          <el-table-column
+            fixed="right"
+            label="Operation"
+            width="200">
+            <template slot-scope="scope">
+              <el-button @click="postUpgradeData([scope.row.package])" type="success" size="small"
+                         :disabled="upgradeDisabled[scope.row.package]">Upgrade
+              </el-button>
+              <el-button @click="postUninstallData([scope.row.package])" type="danger" size="small">Uninstall
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <search-package
+        :show="searchDialogVisible"
+        @closeDialog="searchDialogVisible=false">
+      </search-package>
+      <settings></settings>
     </div>
-    <search-package
-      :show="searchDialogVisible"
-      @closeDialog="searchDialogVisible=false">
-    </search-package>
-    <settings></settings>
   </div>
 </template>
 
 <script>
   import Vue from 'vue'
-  import SearchPackage from '../search/SearchPackage'
-  import Settings from '../settings/Settings'
+  import SearchPackage from './search/SearchPackage'
+  import Settings from './settings/Settings'
 
   const TAG_DEFAULT_LATEST = '---';
   const TAG_WAIT_LATEST = 'Checking the update...';
@@ -89,6 +96,7 @@
     name: 'Manager',
     data() {
       return {
+        hasCheckedUpgrade: false,
         loading: true,
         options: [],
         defaultInterpreter: '',
@@ -104,6 +112,7 @@
         multipleSelection: [],
         searchDialogVisible: false,
         settingsDialogVisible: false,
+        upgradeDisabled: {}
       }
     },
     created() {
@@ -131,6 +140,7 @@
           .then(response => {
             this.packageList = response.data.map(val => {
               val.summary = 'Searching for summary...';
+              this.upgradeDisabled[val.package] = true;
               return val
             });
             this.loading = false;
@@ -184,20 +194,46 @@
             this.packageList.forEach((val, index) => {
               if (latestVersions.hasOwnProperty(val.package)) {
                 val.latest = latestVersions[val.package].latest_version;
+                this.upgradeDisabled[val.package] = false
               } else {
                 val.latest = TAG_DEFAULT_LATEST;
+                this.upgradeDisabled[val.package] = true
               }
               // update package list
               Vue.set(this.packageList, index, val);
+              this.$message({
+                message: 'Check update successful.',
+                type: 'success'
+              });
+              this.hasCheckedUpgrade = true;
             })
           })
           .catch(error => {
             console.log(error);
+            this.hasCheckedUpgrade = true;
+            this.$message.error('Check update failed.');
           });
+      },
+      // if pkg can be upgraded
+      canUpgrade(pkg) {
+        console.log('this', this);
+        return !this.upgradeDisabled[pkg]
       },
       postUpgradeData(pkg) {
         if (pkg === '') {
           pkg = this.getPkgsFromSelection()
+        }
+        pkg = pkg.filter(this.canUpgrade);
+        if (pkg.length === 0) {
+          let message = 'There is no upgrade package.';
+          if (!this.hasCheckedUpgrade) {
+            message = 'Please click the "Check Latest" button first.'
+          }
+          this.$message({
+            message: message,
+            type: 'warning'
+          });
+          return
         }
         this.packageList.forEach((val, index) => {
           if (pkg.indexOf(val.package) >= 0) {
@@ -234,12 +270,32 @@
             console.log(error);
             this.$message.error('Upgrade Python package(s) error!');
           });
-
       },
       postUninstallData(pkg) {
         if (pkg === '') {
           pkg = this.getPkgsFromSelection()
         }
+        if (pkg.length === 0) {
+          this.$message({
+            message: 'No packages were selected.',
+            type: 'warning'
+          });
+          return
+        }
+        this.$confirm('This operation will uninstall the selected package, will it continue?', 'Prompt', {
+          confirmButtonText: 'OK',
+          cancelButtonText: 'Cancel',
+          type: 'warning'
+        }).then(() => {
+          this.uninstallPackages(pkg)
+        }).catch(() => {
+          this.$message({
+            type: 'info',
+            message: 'Canceled.'
+          });
+        });
+      },
+      uninstallPackages(pkg) {
         this.packageList.forEach((val, index) => {
           if (pkg.indexOf(val.package) >= 0) {
             val.version = UNINSTALLING;
@@ -326,8 +382,19 @@
     p#p_buttons {
       display: flex;
       justify-content: space-between;
-      span.empty {
+      align-items: center;
+      > span {
         flex: 1;
+        display: flex;
+        #tips {
+          flex: 1;
+          padding: 1em;
+          margin: 0 2em 0 0;
+          background-color: #fffae5;
+          #cl {
+            color: $main_color;
+          }
+        }
       }
     }
     .interpreted-text {
