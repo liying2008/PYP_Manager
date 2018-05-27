@@ -13,6 +13,7 @@
 <style>
   body {
     width: 90%;
+    display: block;
     margin: 0 auto;
   }
 </style>

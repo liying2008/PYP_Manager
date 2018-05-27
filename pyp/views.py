@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import sys
+from collections import OrderedDict
 
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -13,12 +14,13 @@ from django.views.decorators.csrf import csrf_exempt
 from pyp.model.latest import Latest
 from pyp.model.package import Package
 from pyp.model.summary import Summary
+from pyp.utils import get_list_from_dict
 from pyp.wrapper import fn_timer
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-package_dict = {}
+package_dict = OrderedDict()
 
 
 @fn_timer
@@ -40,24 +42,24 @@ def p_list_simple(request):
 @fn_timer
 @csrf_exempt
 def summary(request):
-    if request.method == 'POST':
-        p_list_str = request.POST.get('list', '[]')
-        print(p_list_str)
-        p_list = json.loads(p_list_str, "utf-8")
-        summary_dict = {}
-        for p in p_list:
-            cmd = 'python -m pip show ' + p + ' --isolated --disable-pip-version-check'
-            splites = os.popen(cmd).readlines()
-            s = Summary()
-            s.package = p
-            if len(splites) >= 3 and splites[2].startswith('Summary:'):
-                s.summary = splites[2].split(': ')[1]
-            else:
-                s.summary = ''
-            summary_dict[p] = s.__dict__
-        print summary_dict
-        return HttpResponse(json.dumps(summary_dict))
-    return HttpResponse('{}')
+    if request.method != 'POST':
+        return HttpResponse('{}')
+    p_list_str = request.POST.get('list', '[]')
+    print(p_list_str)
+    p_list = json.loads(p_list_str, "utf-8")
+    summary_dict = {}
+    for p in p_list:
+        cmd = 'python -m pip show ' + p + ' --isolated --disable-pip-version-check'
+        splites = os.popen(cmd).readlines()
+        s = Summary()
+        s.package = p
+        if len(splites) >= 3 and splites[2].startswith('Summary:'):
+            s.summary = splites[2].split(': ')[1]
+        else:
+            s.summary = ''
+        summary_dict[p] = s.__dict__
+    print summary_dict
+    return HttpResponse(json.dumps(summary_dict))
 
 
 @fn_timer
@@ -76,14 +78,18 @@ def check_latest(request):
 
 @fn_timer
 @csrf_exempt
-def upgrade(request):
+def install(request):
     if request.method != 'POST':
         return HttpResponse('{}')
     p_list_str = request.POST.get('list', '[]')
+    is_upgrade = request.POST.get('upgrade', '0')
     p_list = json.loads(p_list_str, "utf-8")
     upgrade_dict = {}
     for p in p_list:
-        cmd = 'python -m pip install -U ' + p + ' --isolated'
+        cmd = 'python -m pip install ' + p + ' --isolated'
+        if is_upgrade == '1':
+            cmd = 'python -m pip install -U ' + p + ' --isolated'
+        # print("cmd", cmd)
         output = os.popen(cmd).read()
         if 'Successfully installed ' in output or 'Requirement already up-to-date' in output:
             upgrade_dict[p] = 'success'
@@ -120,14 +126,3 @@ def get_interpreter(request):
     options.append({'path': exe_path, 'version': platform_version})
     # print(options)
     return HttpResponse(json.dumps(options))
-
-
-def get_list_from_dict(dict):
-    list = []
-    for index, item in dict.items():
-        list.append(item.__dict__)
-
-    # ========= Just for develop and test ===========
-    list = list[:5]
-    # ===============================================
-    return list

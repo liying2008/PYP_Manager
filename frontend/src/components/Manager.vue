@@ -1,5 +1,5 @@
 <template>
-  <div class="manager-container">
+  <div id="manager-container">
     <p id="p_interpreter"><span class="interpreted-text">Python Interpreter: </span>
       <el-select id="selector" v-model="defaultInterpreter" placeholder="正在检测 Python 解释器路径">
         <el-option
@@ -75,7 +75,10 @@
         :show="searchDialogVisible"
         @closeDialog="searchDialogVisible=false">
       </search-package>
-      <settings></settings>
+      <settings
+        :show="settingsDialogVisible"
+        @closeDialog="settingsDialogVisible=false">
+      </settings>
     </div>
   </div>
 </template>
@@ -216,7 +219,6 @@
       },
       // if pkg can be upgraded
       canUpgrade(pkg) {
-        console.log('this', this);
         return !this.upgradeDisabled[pkg]
       },
       postUpgradeData(pkg) {
@@ -245,7 +247,8 @@
         // console.log(pkg);
         let params = new URLSearchParams();
         params.append('list', JSON.stringify(pkg));
-        this.$axios.post('/upgrade', params)
+        params.append('upgrade', '1');
+        this.$axios.post('/install', params)
           .then(response => {
             let upgradeDict = response.data;
             console.log(upgradeDict);
@@ -283,7 +286,7 @@
           return
         }
         this.$confirm('This operation will uninstall the selected package, will it continue?', 'Prompt', {
-          confirmButtonText: 'OK',
+          confirmButtonText: 'Confirm',
           cancelButtonText: 'Cancel',
           type: 'warning'
         }).then(() => {
@@ -348,7 +351,7 @@
           row.version.indexOf(UNINSTALL_FAILED) === 0) {
           style = 'failed-row';
         } else if (row.version.indexOf(UPDATING) === 0) {
-          style = 'updating-row';
+          style = 'installing-row';
         }
         return style
       }
@@ -363,7 +366,7 @@
 <style lang="scss">
   $main_color: #409EFF;
 
-  .manager-container {
+  #manager-container {
     margin: 20px 26px 26px 20px;
     p#p_interpreter {
       display: flex;
@@ -402,21 +405,22 @@
       font-family: monospace, sans-serif;
       font-size: 1.2em;
     }
-  }
 
-  .el-table .warning-row {
-    background: #defdff;
-  }
+    .el-table .warning-row {
+      background: #defdff;
+    }
 
-  .el-table .failed-row {
-    background: #feebdd;
-  }
+    .el-table .failed-row {
+      background: #feebdd;
+    }
 
-  .el-table .success-row {
-    background: #def9d7;
-  }
+    .el-table .success-row {
+      background: #def9d7;
+    }
 
-  .el-table .updating-row {
-    background: #e6e6e6;
+    .el-table .installing-row {
+      background: #e6e6e6;
+    }
+
   }
 </style>
