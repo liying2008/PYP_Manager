@@ -1,19 +1,20 @@
 <template>
   <el-dialog
     title="Search Packages"
-    :visible.sync="dialogVisible"
     width="80%"
     height="100%"
+    :visible.sync="dialogVisible"
     :close-on-click-modal="false"
     :before-close="handleClose">
     <el-container id="search-container">
       <el-header>
         <div style="margin-top: 14px;">
-          <el-input placeholder="Please enter the package name" v-model="searchPackage"
-                    @keyup.native.enter="postSearchData">
+          <el-autocomplete placeholder="Please enter the package name" class="inline-input" v-model="searchPackage"
+                           :fetch-suggestions="querySearch"
+                           @keyup.native.enter="postSearchData">
             <template slot="prepend">Package Name:</template>
             <el-button slot="append" icon="el-icon-search" @click="postSearchData"></el-button>
-          </el-input>
+          </el-autocomplete>
         </div>
       </el-header>
       <el-main>
@@ -69,6 +70,7 @@
 
 <script>
   import Vue from 'vue'
+  import {LOCAL_STORAGE_KEYWORDS} from "../constants";
 
   const SUCCESS = 'SUCCESS';
   const FAILED = 'FAILED';
@@ -86,6 +88,7 @@
     data() {
       return {
         loading: false,
+        savedKeywords: [],
         operationBtnState: {},
         searchPackage: '',
         /*
@@ -104,9 +107,45 @@
         return this.show;
       }
     },
+    mounted() {
+      this.savedKeywords = this.readSearchKeyword();
+    },
     methods: {
       handleClose() {
         this.$emit('closeDialog');
+      },
+      querySearch(queryString, cb) {
+        let savedKeywords = this.savedKeywords;
+        let results = queryString ? savedKeywords.filter(this.createFilter(queryString)) : savedKeywords;
+        // Call callback function to return the data for the suggestion list
+        cb(results);
+      },
+      createFilter(queryString) {
+        return (keyword) => {
+          return (keyword.value.toLowerCase().indexOf(queryString.toLowerCase()) !== -1);
+        };
+      },
+      // Save search keyword to localStorage
+      saveSearchKeyword(keyword) {
+        let str = localStorage.getItem(LOCAL_STORAGE_KEYWORDS);
+        if (str == null) {
+          str = '[]'
+        }
+        let keywords = JSON.parse(str);
+        let hasContained = keywords.some((val, index) => (val.value === keyword));
+        if (!hasContained) {
+          keywords.push({value: keyword});
+          localStorage.setItem(LOCAL_STORAGE_KEYWORDS, JSON.stringify(keywords));
+          this.savedKeywords = keywords;
+        }
+      },
+      // Read search keyword from localStorage
+      readSearchKeyword() {
+        let str = localStorage.getItem(LOCAL_STORAGE_KEYWORDS);
+        if (str == null) {
+          str = '[]'
+        }
+        return JSON.parse(str);
       },
       postSearchData() {
         let p = this.searchPackage.trim();
@@ -117,6 +156,8 @@
           });
           return
         }
+        // store search keyword to lcoal storage
+        this.saveSearchKeyword(p);
         this.loading = true;
         let params = new URLSearchParams();
         params.append('p', p);
@@ -283,7 +324,9 @@
 
 <style lang="scss">
   #search-container {
-
+    .inline-input {
+      width: 100%;
+    }
     .el-table .warning-row {
       background: #defdff;
     }

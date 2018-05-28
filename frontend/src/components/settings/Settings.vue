@@ -1,21 +1,28 @@
 <template>
   <el-dialog
-    title="Search Packages"
-    :visible.sync="dialogVisible"
+    id="settings-container"
+    title="Settings"
     width="60%"
+    :visible.sync="dialogVisible"
     :before-close="handleClose">
-    <span>This is a message</span>
+    <el-row>
+      <el-col :span="24">
+        <el-button class="long-btn"
+                   @click="clearSearchRecords">Clear Search Records
+        </el-button>
+      </el-col>
+    </el-row>
     <span slot="footer" class="dialog-footer">
-    <el-button @click="handleClose(false)">Cancel</el-button>
-    <el-button type="primary" @click="handleClose(false)">Confirm</el-button>
   </span>
   </el-dialog>
 </template>
 
 <script>
+  import {LOCAL_STORAGE_KEYWORDS} from "../constants";
+
   export default {
     name: 'Settings',
-        props: ['show'],
+    props: ['show'],
     data() {
       return {};
     },
@@ -25,26 +32,31 @@
       }
     },
     methods: {
-      handleClose(needConfirm) {
-        if (needConfirm) {
-          this.$confirm('Are you sure to close this dialog?', 'Prompt', {
-            confirmButtonText: 'Confirm',
-            cancelButtonText: 'Cancel',
-            type: 'warning'
-          })
-            .then(_ => {
-              this.$emit('closeDialog');
-            })
-            .catch(_ => {
-            });
-        } else {
-          this.$emit('closeDialog');
-        }
+      handleClose() {
+        this.$emit('closeDialog');
+      },
+      clearSearchRecords() {
+        this.$confirm('Are you sure you want to delete records of search packages?', 'Prompt', {
+          confirmButtonText: 'Confirm',
+          cancelButtonText: 'Cancel',
+          type: 'warning'
+        }).then(() => {
+          localStorage.removeItem(LOCAL_STORAGE_KEYWORDS)
+        }).catch(() => {
+          this.$message({
+            type: 'info',
+            message: 'Canceled.'
+          });
+        });
       }
     }
   }
 </script>
 
-<style scoped>
-
+<style lang="scss">
+  #settings-container {
+    .long-btn {
+      width: 100%;
+    }
+  }
 </style>
