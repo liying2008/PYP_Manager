@@ -5,8 +5,16 @@
 </template>
 
 <script>
+  import {LOCAL_STORAGE_LANG} from './components/constants';
+
   export default {
-    name: 'App'
+    name: 'App',
+    created() {
+      let lang = localStorage.getItem(LOCAL_STORAGE_LANG);
+      if (lang != null) {
+        this.$i18n.locale = lang;
+      }
+    }
   }
 </script>
 

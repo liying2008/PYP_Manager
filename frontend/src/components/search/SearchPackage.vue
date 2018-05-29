@@ -1,62 +1,69 @@
 <template>
   <el-dialog
-    title="Search Packages"
     width="80%"
     height="100%"
+    :title="$t('search.title')"
     :visible.sync="dialogVisible"
     :close-on-click-modal="false"
     :before-close="handleClose">
     <el-container id="search-container">
       <el-header>
         <div style="margin-top: 14px;">
-          <el-autocomplete placeholder="Please enter the package name" class="inline-input" v-model="searchPackage"
+          <el-autocomplete class="inline-input" v-model="searchPackage"
                            :fetch-suggestions="querySearch"
+                           :placeholder="$t('search.inputPlaceholder')"
                            @keyup.native.enter="postSearchData">
-            <template slot="prepend">Package Name:</template>
+            <template slot="prepend">{{$t('search.inputPrepend')}}</template>
             <el-button slot="append" icon="el-icon-search" @click="postSearchData"></el-button>
           </el-autocomplete>
         </div>
       </el-header>
       <el-main>
         <el-table
-          :data="tableData"
           v-loading="loading"
           border
-          :row-class-name="tableRowClassName"
           max-height="540"
-          style="width: 100%">
+          style="width: 100%"
+          :data="tableData"
+          :row-class-name="tableRowClassName">
           <el-table-column
             fixed
             prop="package"
-            label="Package"
-            width="220">
+            width="220"
+            :label="$t('common.package')">
           </el-table-column>
           <el-table-column
             prop="version"
-            label="Version"
-            width="120">
+            width="120"
+            :label="$t('common.version')">
           </el-table-column>
           <el-table-column
             prop="installed"
-            label="Installed?"
-            width="200">
+            width="200"
+            :label="$t('search.isInstalled')">
           </el-table-column>
           <el-table-column
             prop="summary"
-            label="Summary">
+            :label="$t('common.summary')">
           </el-table-column>
           <el-table-column
             fixed="right"
-            label="Operation"
-            width="160">
+            width="160"
+            :label="$t('common.operation')">
             <template slot-scope="scope">
               <el-button @click="postInstallData(scope.row.package)" type="text" size="small"
-                         :disabled="!operationBtnState[scope.row.package].canInstall">
-                {{operationBtnState[scope.row.package].installText}}
+                         :disabled="!operationBtnState[scope.row.package].canInstall"
+                         v-if="operationBtnState[scope.row.package].installText === 'install'">
+                {{$t('search.opInstall')}}
+              </el-button>
+              <el-button @click="postInstallData(scope.row.package)" type="text" size="small"
+                         :disabled="!operationBtnState[scope.row.package].canInstall"
+                         v-else>
+                {{$t('search.opUpgrade')}}
               </el-button>
               <el-button @click="postUninstallData(scope.row.package)" type="text" size="small"
                          :disabled="!operationBtnState[scope.row.package].canUninstall">
-                Uninstall
+                {{$t('common.uninstall')}}
               </el-button>
             </template>
           </el-table-column>
@@ -70,17 +77,7 @@
 
 <script>
   import Vue from 'vue'
-  import {LOCAL_STORAGE_KEYWORDS} from "../constants";
-
-  const SUCCESS = 'SUCCESS';
-  const FAILED = 'FAILED';
-  const UPDATING = 'Updating...';
-  const INSTALLING = 'Installing...';
-  const UNINSTALLING = 'Uninstalling...';
-  const UNINSTALL_FAILED = 'FAILED';
-
-  const OP_INSTALL = 'Install';
-  const OP_UPGRADE = 'Upgrade';
+  import {LOCAL_STORAGE_KEYWORDS} from '../constants';
 
   export default {
     name: 'SearchPackage',
@@ -99,7 +96,15 @@
           summary: 'A high-level Python Web framework that encourages rapid development and clean, pragmatic design.',
         }
         */
-        tableData: []
+        tableData: [],
+
+        // Some constants
+        SUCCESS: this.$t('search.success'),
+        FAILED: this.$t('search.failed'),
+        UPDATING: this.$t('search.updating'),
+        INSTALLING: this.$t('search.installing'),
+        UNINSTALLING: this.$t('search.uninstalling'),
+        UNINSTALL_FAILED: this.$t('search.uninstallFailed')
       };
     },
     computed: {
@@ -151,7 +156,7 @@
         let p = this.searchPackage.trim();
         if (p === '') {
           this.$message({
-            message: 'Please enter the package name first.',
+            message: this.$t('search.needInput'),
             type: 'warning'
           });
           return
@@ -167,18 +172,18 @@
             this.tableData = response.data.map(val => {
               let thisItemState = {};
               if (val.is_installed) {
-                val.installed = 'INSTALLED: ' + val.installed_version;
+                val.installed = this.$t('search.installed') + val.installed_version;
                 if (val.installed_version === val.version) {
-                  thisItemState.installText = OP_INSTALL;
+                  thisItemState.installText = 'install';
                   thisItemState.canInstall = false;
                 } else {
-                  thisItemState.installText = OP_UPGRADE;
+                  thisItemState.installText = 'upgrade';
                   thisItemState.canInstall = true;
                 }
                 thisItemState.canUninstall = true;
               } else {
                 val.installed = '';
-                thisItemState.installText = OP_INSTALL;
+                thisItemState.installText = 'install';
                 thisItemState.canInstall = true;
                 thisItemState.canUninstall = false;
               }
@@ -195,12 +200,12 @@
       postInstallData(pkg) {
         let text = this.operationBtnState[pkg].installText;
         let msg = '';
-        if (text === OP_INSTALL) {
+        if (text === 'install') {
           // Install package
-          msg = INSTALLING;
-        } else if (text === OP_UPGRADE) {
+          msg = this.INSTALLING;
+        } else if (text === 'upgrade') {
           // Upgrade package
-          msg = UPDATING
+          msg = this.UPDATING
         }
         let length = this.tableData.length;
         for (let i = 0; i < length; i++) {
@@ -216,7 +221,7 @@
         pkg = [pkg];
         let params = new URLSearchParams();
         params.append('list', JSON.stringify(pkg));
-        if (text === OP_UPGRADE) {
+        if (text === 'upgrade') {
           params.append('upgrade', '1');
         }
         this.$axios.post('/install', params)
@@ -228,12 +233,12 @@
               if (upgradeDict.hasOwnProperty(val.package)) {
                 let result = upgradeDict[val.package];
                 if (result === 'success') {
-                  val.installed = SUCCESS;
-                  this.operationBtnState[val.package].installText = OP_INSTALL;
+                  val.installed = this.SUCCESS;
+                  this.operationBtnState[val.package].installText = 'install';
                   this.operationBtnState[val.package].canInstall = false;
                   this.operationBtnState[val.package].canUninstall = true;
                 } else if (result === 'failed') {
-                  val.installed = FAILED
+                  val.installed = this.FAILED
                 }
                 // update package list
                 Vue.set(this.tableData, i, val);
@@ -243,20 +248,20 @@
           })
           .catch(error => {
             console.log(error);
-            this.$message.error('Upgrade Python package(s) error!');
+            this.$message.error(this.$t('search.upgradeErr'));
           });
       },
       postUninstallData(pkg) {
-        this.$confirm('This operation will uninstall this package, will it continue?', 'Prompt', {
-          confirmButtonText: 'Confirm',
-          cancelButtonText: 'Cancel',
+        this.$confirm(this.$t('search.uninstallPrompt'), this.$t('common.prompt'), {
+          confirmButtonText: this.$t('common.confirm'),
+          cancelButtonText: this.$t('common.cancel'),
           type: 'warning'
         }).then(() => {
           this.uninstallPackage(pkg)
         }).catch(() => {
           this.$message({
             type: 'info',
-            message: 'Canceled.'
+            message: this.$t('common.canceled')
           });
         });
       },
@@ -265,7 +270,7 @@
         for (let i = 0; i < length; i++) {
           let val = this.tableData[i];
           if (pkg === val.package) {
-            val.installed = UNINSTALLING;
+            val.installed = this.UNINSTALLING;
             // update package list
             Vue.set(this.tableData, i, val);
             break
@@ -284,12 +289,12 @@
               if (uninstallDict.hasOwnProperty(val.package)) {
                 let result = uninstallDict[val.package];
                 if (result === 'success') {
-                  val.installed = SUCCESS;
-                  this.operationBtnState[val.package].installText = OP_INSTALL;
+                  val.installed = this.SUCCESS;
+                  this.operationBtnState[val.package].installText = 'install';
                   this.operationBtnState[val.package].canInstall = true;
                   this.operationBtnState[val.package].canUninstall = false;
                 } else if (result === 'failed') {
-                  val.installed = UNINSTALL_FAILED;
+                  val.installed = this.UNINSTALL_FAILED;
                 }
                 // update package list
                 Vue.set(this.tableData, i, val);
@@ -299,7 +304,7 @@
           })
           .catch(error => {
             console.log(error);
-            this.$message.error('Uninstall Python package(s) error!');
+            this.$message.error(this.$t('search.uninstallErr'));
           });
       },
       tableRowClassName({row, rowIndex}) {
@@ -307,13 +312,13 @@
         if (row.installed !== undefined && row.installed !== '') {
           style = 'warning-row';
         }
-        if (row.installed.indexOf(SUCCESS) === 0) {
+        if (row.installed.indexOf(this.SUCCESS) === 0) {
           style = 'success-row';
-        } else if (row.installed.indexOf(FAILED) === 0 ||
-          row.installed.indexOf(UNINSTALL_FAILED) === 0) {
+        } else if (row.installed.indexOf(this.FAILED) === 0 ||
+          row.installed.indexOf(this.UNINSTALL_FAILED) === 0) {
           style = 'failed-row';
-        } else if (row.installed.indexOf(UPDATING) === 0 ||
-          row.installed.indexOf(INSTALLING) === 0) {
+        } else if (row.installed.indexOf(this.UPDATING) === 0 ||
+          row.installed.indexOf(this.INSTALLING) === 0) {
           style = 'installing-row';
         }
         return style
